@@ -30,12 +30,12 @@ public class UserController {
             log.error("Invalid login {}", body.getLogin());
             throw new ConditionsNotMetException("Invalid login");
         }
-        if(body.getBirthday() != null &&  body.getBirthday().toInstant().isAfter(Instant.now())) {
+        if (body.getBirthday() != null &&  body.getBirthday().toInstant().isAfter(Instant.now())) {
             log.error("Invalid birthday {}", body.getBirthday());
             throw new ConditionsNotMetException("Invalid birthday");
         }
 
-        if(body.getEmail() != null) {
+        if (body.getEmail() != null) {
             findByEmail(body.getEmail()).ifPresent(u -> {
                 log.error("Duplicate email {}", u.getEmail());
                 throw new ConditionsNotMetException("Email already exists");
