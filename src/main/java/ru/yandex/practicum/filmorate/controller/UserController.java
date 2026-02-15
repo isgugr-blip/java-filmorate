@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 @RequestMapping("/users")
 public class UserController {
     HashMap<Long, User> users = new HashMap<>();
+
     @PostMapping
     public User create(@Valid @RequestBody User body) {
         if (body.getEmail() == null || !Pattern.matches("^(.+)@(\\S+)$", body.getEmail())) {
@@ -94,6 +95,7 @@ public class UserController {
 
         return updatedUser;
     }
+
     @GetMapping
     public Collection<User> findAll() {
         return users.values();

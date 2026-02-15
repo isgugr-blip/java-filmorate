@@ -16,6 +16,7 @@ import java.util.HashMap;
 @RequestMapping("/films")
 public class FilmController {
     HashMap<Long, Film> films = new HashMap<>();
+
     @PostMapping
     public Film create(@Valid @RequestBody Film body) {
         Film film = Film.builder()
@@ -30,6 +31,7 @@ public class FilmController {
 
         return film;
     }
+
     @PutMapping
     public Film update(@Valid @RequestBody(required = false) Film body) {
         if (body == null) {
@@ -60,6 +62,7 @@ public class FilmController {
 
         return updatedFilm;
     }
+
     @GetMapping
     public Collection<Film> findAll() {
         return films.values();
