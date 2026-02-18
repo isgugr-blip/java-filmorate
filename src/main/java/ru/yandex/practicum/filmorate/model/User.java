@@ -11,19 +11,19 @@ import java.util.Date;
 @Data
 @Builder(toBuilder = true)
 public class User {
-    Long id;
+    private Long id;
 
     @Email
-    String email;
+    private String email;
 
     @NotNull
     @NotBlank
-    String login;
+    private String login;
 
     @Nullable
-    String name;
+    private String name;
 
     @Past
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
-    Date birthday;
+    private Date birthday;
 }
