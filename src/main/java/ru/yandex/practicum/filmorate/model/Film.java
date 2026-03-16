@@ -9,6 +9,8 @@ import lombok.Data;
 import ru.yandex.practicum.filmorate.validation.AfterDate;
 
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
 
 @Data
 @Builder(toBuilder = true)
@@ -23,4 +25,6 @@ public class Film {
     private Date releaseDate;
     @Min(1)
     private int duration;
+    @Builder.Default
+    private Set<Long> likes = new HashSet<>();
 }
