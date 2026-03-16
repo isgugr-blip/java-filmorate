@@ -57,15 +57,10 @@ public class FilmService {
         film.getLikes().remove(userId);
     }
 
-    public Optional<Film> getMostLikedFilm() {
-        return filmStorage.getAll().stream()
-                .max(Comparator.comparingInt(f -> f.getLikes().size()));
-    }
-
     public Collection<Film> getFilmsByLikes(int count) {
         return filmStorage.getAll().stream()
-                .sorted(Comparator.comparingInt(f -> f.getLikes().size()))
+                .sorted(Comparator.comparingInt((Film f) -> f.getLikes().size()).reversed())
                 .limit(count)
-                .collect(Collectors.toList()).reversed();
+                .collect(Collectors.toList());
     }
 }

@@ -8,12 +8,10 @@ import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
-import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -26,25 +24,10 @@ public class UserService {
     }
 
     public User createUser(User user) {
-        if (user.getEmail() == null || !Pattern.matches("^(.+)@(\\S+)$", user.getEmail())) {
-            log.error("Invalid email {}", user.getEmail());
-            throw new ConditionsNotMetException("Invalid email", "email", user.getEmail());
-        }
-        if (user.getLogin() == null || !Pattern.matches(".*\\S.*", user.getLogin())) {
-            log.error("Invalid login {}", user.getLogin());
-            throw new ConditionsNotMetException("Invalid login", "login", user.getLogin());
-        }
-        if (user.getBirthday() != null &&  user.getBirthday().toInstant().isAfter(Instant.now())) {
-            log.error("Invalid birthday {}", user.getBirthday());
-            throw new ConditionsNotMetException("Invalid birthday", "birthday", user.getBirthday());
-        }
-
-        if (user.getEmail() != null) {
-            userStorage.getByEmail(user.getEmail()).ifPresent(u -> {
-                log.error("Duplicate email {}", u.getEmail());
-                throw new ConditionsNotMetException("Email already exists", "email", u.getEmail());
-            });
-        }
+        userStorage.getByEmail(user.getEmail()).ifPresent(u -> {
+            log.error("Duplicate email {}", u.getEmail());
+            throw new ConditionsNotMetException("Email already exists", "email", u.getEmail());
+        });
 
         return userStorage.create(user);
     }

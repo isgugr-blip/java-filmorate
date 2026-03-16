@@ -7,14 +7,15 @@ import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.service.FilmService;
 
+import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
+
 import java.util.Collection;
-import java.util.Optional;
 
 @Slf4j
 @RestController
 @RequestMapping("/films")
 public class FilmController {
-    FilmService filmService;
+    private final FilmService filmService;
 
     @Autowired
     public FilmController(FilmService filmService) {
@@ -27,10 +28,7 @@ public class FilmController {
     }
 
     @PutMapping
-    public Film update(@Valid @RequestBody(required = false) Film body) {
-        if (body == null) {
-            return null;
-        }
+    public Film update(@Valid @RequestBody Film body) {
         return filmService.updateFilm(body.getId(), body);
     }
 
@@ -40,8 +38,9 @@ public class FilmController {
     }
 
     @GetMapping("/{id}")
-    public Optional<Film> findById(@PathVariable Long id) {
-        return filmService.getFilmById(id);
+    public Film findById(@PathVariable Long id) {
+        return filmService.getFilmById(id)
+                .orElseThrow(() -> new NotFoundException("Film with id " + id + " not found"));
     }
 
     @PutMapping("/{id}/like/{userId}")

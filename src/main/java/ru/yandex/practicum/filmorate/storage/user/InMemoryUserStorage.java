@@ -8,6 +8,7 @@ import ru.yandex.practicum.filmorate.utils.Utils;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -35,8 +36,18 @@ public class InMemoryUserStorage implements UserStorage {
 
     @Override
     public User update(Long id, User updatedUser) {
-        users.replace(id, updatedUser);
-        return updatedUser;
+        User existingUser = users.get(id);
+        User newUser = existingUser.toBuilder()
+                .email(updatedUser.getEmail())
+                .login(updatedUser.getLogin())
+                .name(
+                        updatedUser.getName() == null || updatedUser.getName().trim().isBlank() ?
+                                updatedUser.getLogin() : updatedUser.getName().trim()
+                )
+                .birthday(updatedUser.getBirthday())
+                .build();
+        users.replace(id, newUser);
+        return newUser;
     }
 
     @Override
@@ -48,7 +59,7 @@ public class InMemoryUserStorage implements UserStorage {
     public Optional<User> getByEmail(String email) {
         return users.values()
                 .stream()
-                .filter(u -> u.getEmail().equals(email))
+                .filter(u -> Objects.equals(u.getEmail(), email))
                 .findFirst();
     }
 
