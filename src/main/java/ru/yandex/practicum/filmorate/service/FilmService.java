@@ -40,19 +40,21 @@ public class FilmService {
     }
 
     public void addLike(Long id, Long userId) {
+        if (!userStorage.existsById(userId)) {
+            throw new NotFoundException("User with id " + userId + " does not exist");
+        }
         Film film = getFilmById(id)
                 .orElseThrow(() -> new NotFoundException("Film with id " + id + " does not exist"));
-        userStorage.getById(userId)
-                .orElseThrow(() -> new NotFoundException("User with id " + userId + " does not exist"));
 
         film.getLikes().add(userId);
     }
 
     public void removeLike(Long id, Long userId) {
+        if (!userStorage.existsById(userId)) {
+            throw new NotFoundException("User with id " + userId + " does not exist");
+        }
         Film film = getFilmById(id)
                 .orElseThrow(() -> new NotFoundException("Film with id " + id + " does not exist"));
-        userStorage.getById(userId)
-                .orElseThrow(() -> new NotFoundException("User with id " + userId + " does not exist"));
 
         film.getLikes().remove(userId);
     }

@@ -24,11 +24,6 @@ public class UserService {
     }
 
     public User createUser(User user) {
-        userStorage.getByEmail(user.getEmail()).ifPresent(u -> {
-            log.error("Duplicate email {}", u.getEmail());
-            throw new ConditionsNotMetException("Email already exists", "email", u.getEmail());
-        });
-
         return userStorage.create(user);
     }
 
@@ -42,13 +37,9 @@ public class UserService {
 
         optionalUser.ifPresentOrElse(
                 user -> {
-                    if (!updatedUser.getEmail().equals(user.getEmail())) {
-                        userStorage.getByEmail(updatedUser.getEmail()).ifPresent(u -> {
-                            if (!u.getId().equals(updatedUser.getId())) {
-                                log.error("Duplicate email {}", u.getEmail());
-                                throw new ConditionsNotMetException("Email already exists", "email", updatedUser.getEmail());
-                            }
-                        });
+                    if (!updatedUser.getEmail().equals(user.getEmail()) && userStorage.emailExists(updatedUser.getEmail())) {
+                        log.error("Duplicate email {}", user.getEmail());
+                        throw new ConditionsNotMetException("Email already exists", "email", updatedUser.getEmail());
                     }
                 },
                 () -> {

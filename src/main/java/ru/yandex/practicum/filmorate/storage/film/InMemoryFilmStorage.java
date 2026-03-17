@@ -59,6 +59,11 @@ public class InMemoryFilmStorage implements FilmStorage {
     }
 
     @Override
+    public boolean existsById(Long id) {
+        return films.containsKey(id);
+    }
+
+    @Override
     public Optional<Film> getById(Long id) {
         return Optional.ofNullable(films.get(id));
     }

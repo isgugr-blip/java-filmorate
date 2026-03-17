@@ -6,15 +6,19 @@ import java.util.Collection;
 import java.util.Optional;
 
 public interface UserStorage {
-    public User create(User user);
+    User create(User user);
 
-    public User update(Long id, User user);
+    User update(Long id, User user);
 
-    public Optional<User> getById(Long id);
+    boolean existsById(Long id);
 
-    public Optional<User> getByEmail(String email);
+    boolean emailExists(String email);
 
-    public Collection<User> getAllUsers();
+    Optional<User> getById(Long id);
 
-    public void delete(Long id);
+    Optional<User> getByEmail(String email);
+
+    Collection<User> getAllUsers();
+
+    void delete(Long id);
 }
