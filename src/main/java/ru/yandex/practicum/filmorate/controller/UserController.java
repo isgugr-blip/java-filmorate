@@ -2,110 +2,63 @@ package ru.yandex.practicum.filmorate.controller;
 
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-import ru.yandex.practicum.filmorate.exceptions.ConditionsNotMetException;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
-import ru.yandex.practicum.filmorate.utils.Utils;
+import ru.yandex.practicum.filmorate.service.UserService;
 
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Optional;
-import java.util.regex.Pattern;
 
 @Slf4j
 @RestController
 @RequestMapping("/users")
 public class UserController {
-    private final HashMap<Long, User> users = new HashMap<>();
+    private final UserService userService;
+
+    @Autowired
+    public UserController(UserService userService) {
+        this.userService = userService;
+    }
 
     @PostMapping
     public User create(@Valid @RequestBody User body) {
-        if (body.getEmail() == null || !Pattern.matches("^(.+)@(\\S+)$", body.getEmail())) {
-            log.error("Invalid email {}", body.getEmail());
-            throw new ConditionsNotMetException("Invalid email");
-        }
-        if (body.getLogin() == null || !Pattern.matches(".*\\S.*", body.getLogin())) {
-            log.error("Invalid login {}", body.getLogin());
-            throw new ConditionsNotMetException("Invalid login");
-        }
-        if (body.getBirthday() != null &&  body.getBirthday().toInstant().isAfter(Instant.now())) {
-            log.error("Invalid birthday {}", body.getBirthday());
-            throw new ConditionsNotMetException("Invalid birthday");
-        }
-
-        if (body.getEmail() != null) {
-            findByEmail(body.getEmail()).ifPresent(u -> {
-                log.error("Duplicate email {}", u.getEmail());
-                throw new ConditionsNotMetException("Email already exists");
-            });
-        }
-
-        User user = User.builder()
-                .id(Utils.getNextId(users))
-                .email(body.getEmail())
-                .login(body.getLogin())
-                .name(
-                        body.getName() == null || body.getName().trim().isBlank() ?
-                                body.getLogin() : body.getName().trim()
-                )
-                .birthday(body.getBirthday())
-                .build();
-
-        users.put(user.getId(), user);
-        log.info("Created user {}", user);
-
-        return user;
+        return userService.createUser(body);
     }
 
     @PutMapping
     public User update(@Valid @RequestBody User body) {
-        if (body.getId() == null) {
-            log.error("ID is null");
-            throw new ConditionsNotMetException("Invalid id");
-        }
-        User user = users.get(body.getId());
-
-        if (user == null) {
-            log.error("User not found {}", body.getId());
-            throw new NotFoundException("User not found");
-        }
-
-        if (!body.getEmail().equals(user.getEmail())) {
-            findByEmail(body.getEmail()).ifPresent(u -> {
-                if (!u.getId().equals(body.getId())) {
-                    log.error("Duplicate email {}", u.getEmail());
-                    throw new ConditionsNotMetException("Email already exists");
-                }
-            });
-        }
-
-        log.info("Current user {}", user);
-
-        User updatedUser = user.toBuilder()
-                .email(body.getEmail())
-                .login(body.getLogin())
-                .name(body.getName())
-                .birthday(body.getBirthday())
-                .build();
-
-        users.put(updatedUser.getId(), updatedUser);
-        log.info("Updated user {}", updatedUser);
-
-        return updatedUser;
+        return userService.updateUser(body);
     }
 
     @GetMapping
     public Collection<User> findAll() {
-        return new ArrayList<>(users.values());
+        return userService.getAllUsers();
     }
 
-    public Optional<User> findByEmail(String email) {
-        return users.values()
-                .stream()
-                .filter(u -> u.getEmail().equals(email))
-                .findFirst();
+    @GetMapping("/{id}")
+    public User findById(@PathVariable Long id) {
+        return userService.getUserById(id)
+                .orElseThrow(() -> new NotFoundException("User with id " + id + " not found"));
+    }
+
+    @PutMapping("/{id}/friends/{friendId}")
+    public void addFriend(@PathVariable Long id, @PathVariable Long friendId) {
+        userService.addFriend(id, friendId);
+    }
+
+    @GetMapping("/{id}/friends")
+    public Collection<User> findFriends(@PathVariable Long id) {
+        return userService.getFriends(id);
+    }
+
+    @DeleteMapping("/{id}/friends/{friendId}")
+    public void removeFriend(@PathVariable Long id, @PathVariable Long friendId) {
+        userService.removeFriend(id, friendId);
+    }
+
+    @GetMapping("/{id}/friends/common/{otherId}")
+    public Collection<User> getCommonFriends(@PathVariable Long id, @PathVariable Long otherId) {
+        return userService.getCommonFriends(id, otherId);
     }
 }

@@ -3,27 +3,21 @@ package ru.yandex.practicum.filmorate.validation;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.LocalDate;
 
-public class AfterDateValidator implements ConstraintValidator<AfterDate, Date> {
-    private Date minDate;
+public class AfterDateValidator implements ConstraintValidator<AfterDate, LocalDate> {
+    private LocalDate minDate;
 
     @Override
     public void initialize(AfterDate annotation) {
-        try {
-            minDate = new SimpleDateFormat("yyyy-MM-dd").parse(annotation.value());
-        } catch (ParseException e) {
-            throw new IllegalArgumentException("Invalid date format: " + annotation.value(), e);
-        }
+        minDate = LocalDate.parse(annotation.value());
     }
 
     @Override
-    public boolean isValid(Date value, ConstraintValidatorContext context) {
+    public boolean isValid(LocalDate value, ConstraintValidatorContext context) {
         if (value == null) {
             return true;
         }
-        return value.after(minDate);
+        return value.isAfter(minDate);
     }
 }
