@@ -45,7 +45,6 @@ public class FilmDbStorage implements FilmStorage {
         }, keyHolder);
 
         film.setId(Objects.requireNonNull(keyHolder.getKey()).longValue());
-
         saveGenres(film);
 
         return getById(film.getId()).orElse(film);
@@ -119,6 +118,43 @@ public class FilmDbStorage implements FilmStorage {
     @Override
     public void delete(Long id) {
         jdbcTemplate.update("DELETE FROM films WHERE id = ?", id);
+    }
+
+    @Override
+    public void addLike(Long filmId, Long userId) {
+        jdbcTemplate.update(
+                "MERGE INTO film_likes (film_id, user_id) VALUES (?, ?)",
+                filmId, userId
+        );
+    }
+
+    @Override
+    public void removeLike(Long filmId, Long userId) {
+        jdbcTemplate.update(
+                "DELETE FROM film_likes WHERE film_id = ? AND user_id = ?",
+                filmId, userId
+        );
+    }
+
+    @Override
+    public Collection<Film> getPopularFilms(int count) {
+        List<Film> films = jdbcTemplate.query(
+                "SELECT f.id, f.name, f.description, f.release_date, f.duration, " +
+                        "f.mpa_rating_id, m.name AS mpa_name " +
+                        "FROM films f " +
+                        "LEFT JOIN mpa_ratings m ON f.mpa_rating_id = m.id " +
+                        "LEFT JOIN film_likes fl ON f.id = fl.film_id " +
+                        "GROUP BY f.id, f.name, f.description, f.release_date, f.duration, " +
+                        "f.mpa_rating_id, m.name " +
+                        "ORDER BY COUNT(fl.user_id) DESC " +
+                        "LIMIT ?",
+                new FilmRowMapper(),
+                count
+        );
+
+        loadGenres(films);
+        loadLikes(films);
+        return films;
     }
 
     private void saveGenres(Film film) {

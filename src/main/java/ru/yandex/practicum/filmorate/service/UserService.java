@@ -2,58 +2,50 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import ru.yandex.practicum.filmorate.exceptions.ConditionsNotMetException;
+import ru.yandex.practicum.filmorate.dto.UserCreateDto;
+import ru.yandex.practicum.filmorate.dto.UserResponseDto;
+import ru.yandex.practicum.filmorate.dto.UserUpdateDto;
+import ru.yandex.practicum.filmorate.dto.mapper.UserMapper;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
     private final UserStorage userStorage;
-    private final JdbcTemplate jdbcTemplate;
 
-    public User createUser(User user) {
-        return userStorage.create(user);
+    public UserResponseDto createUser(UserCreateDto dto) {
+        User user = UserMapper.toUser(dto);
+        return UserMapper.toResponse(userStorage.create(user));
     }
 
-    public User updateUser(User updatedUser) {
-        if (updatedUser.getId() == null) {
-            log.error("ID is null");
-            throw new ConditionsNotMetException("Invalid ID", "id", updatedUser.getId());
+    public UserResponseDto updateUser(UserUpdateDto dto) {
+        if (dto.getId() == null) {
+            throw new NotFoundException("User id must not be null");
         }
-
-        var optionalUser = userStorage.getById(updatedUser.getId());
-
-        optionalUser.ifPresentOrElse(
-                user -> {
-                    if (!updatedUser.getEmail().equals(user.getEmail()) && userStorage.emailExists(updatedUser.getEmail())) {
-                        log.error("Duplicate email {}", user.getEmail());
-                        throw new ConditionsNotMetException("Email already exists", "email", updatedUser.getEmail());
-                    }
-                },
-                () -> {
-                    log.error("User with id {} does not exist", updatedUser.getId());
-                    throw new NotFoundException("User with id " + updatedUser.getId() + " does not exist");
-                }
-        );
-
-        return userStorage.update(updatedUser.getId(), updatedUser);
+        if (!userStorage.existsById(dto.getId())) {
+            throw new NotFoundException("User with id " + dto.getId() + " does not exist");
+        }
+        User user = UserMapper.toUser(dto);
+        return UserMapper.toResponse(userStorage.update(dto.getId(), user));
     }
 
-    public Optional<User> getUserById(Long id) {
-        return userStorage.getById(id);
+    public UserResponseDto getUserById(Long id) {
+        User user = userStorage.getById(id)
+                .orElseThrow(() -> new NotFoundException("User with id " + id + " not found"));
+        return UserMapper.toResponse(user);
     }
 
-    public Collection<User> getAllUsers() {
-        return userStorage.getAllUsers();
+    public Collection<UserResponseDto> getAllUsers() {
+        return userStorage.getAllUsers().stream()
+                .map(UserMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
     public void addFriend(Long userId, Long friendId) {
@@ -63,66 +55,28 @@ public class UserService {
         if (!userStorage.existsById(friendId)) {
             throw new NotFoundException("User with id " + friendId + " does not exist");
         }
-
-        // Односторонняя дружба: добавляем только запись (userId -> friendId)
-        jdbcTemplate.update(
-                "MERGE INTO friendships (user_id, friend_id, status) VALUES (?, ?, 'UNCONFIRMED')",
-                userId, friendId
-        );
-
-        // Если обратная запись существует — обе становятся CONFIRMED
-        Integer reverseCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM friendships WHERE user_id = ? AND friend_id = ?",
-                Integer.class, friendId, userId
-        );
-        if (reverseCount != null && reverseCount > 0) {
-            jdbcTemplate.update(
-                    "UPDATE friendships SET status = 'CONFIRMED' " +
-                            "WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)",
-                    userId, friendId, friendId, userId
-            );
-        }
+        userStorage.addFriend(userId, friendId);
     }
 
-    public Collection<User> getFriends(Long userId) {
+    public Collection<UserResponseDto> getFriends(Long userId) {
         if (!userStorage.existsById(userId)) {
             throw new NotFoundException("User with id " + userId + " does not exist");
         }
-
-        List<Long> friendIds = jdbcTemplate.query(
-                "SELECT friend_id FROM friendships WHERE user_id = ?",
-                (rs, rowNum) -> rs.getLong("friend_id"),
-                userId
-        );
-
-        return friendIds.stream()
-                .map(userStorage::getById)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .toList();
+        return userStorage.getFriends(userId).stream()
+                .map(UserMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
-    public Collection<User> getCommonFriends(Long userId, Long otherId) {
+    public Collection<UserResponseDto> getCommonFriends(Long userId, Long otherId) {
         if (!userStorage.existsById(userId)) {
             throw new NotFoundException("User with id " + userId + " does not exist");
         }
         if (!userStorage.existsById(otherId)) {
             throw new NotFoundException("User with id " + otherId + " does not exist");
         }
-
-        List<Long> commonIds = jdbcTemplate.query(
-                "SELECT f1.friend_id FROM friendships f1 " +
-                        "JOIN friendships f2 ON f1.friend_id = f2.friend_id " +
-                        "WHERE f1.user_id = ? AND f2.user_id = ?",
-                (rs, rowNum) -> rs.getLong("friend_id"),
-                userId, otherId
-        );
-
-        return commonIds.stream()
-                .map(userStorage::getById)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .toList();
+        return userStorage.getCommonFriends(userId, otherId).stream()
+                .map(UserMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
     public void removeFriend(Long userId, Long friendId) {
@@ -132,17 +86,6 @@ public class UserService {
         if (!userStorage.existsById(friendId)) {
             throw new NotFoundException("User with id " + friendId + " does not exist");
         }
-
-        jdbcTemplate.update(
-                "DELETE FROM friendships WHERE user_id = ? AND friend_id = ?",
-                userId, friendId
-        );
-
-        // Если обратная запись была CONFIRMED — понизить до UNCONFIRMED
-        jdbcTemplate.update(
-                "UPDATE friendships SET status = 'UNCONFIRMED' " +
-                        "WHERE user_id = ? AND friend_id = ?",
-                friendId, userId
-        );
+        userStorage.removeFriend(userId, friendId);
     }
 }

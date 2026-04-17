@@ -1,14 +1,13 @@
 package ru.yandex.practicum.filmorate.dto.mapper;
 
+import lombok.experimental.UtilityClass;
 import ru.yandex.practicum.filmorate.dto.UserCreateDto;
 import ru.yandex.practicum.filmorate.dto.UserResponseDto;
 import ru.yandex.practicum.filmorate.dto.UserUpdateDto;
 import ru.yandex.practicum.filmorate.model.User;
 
-public final class UserMapper {
-
-    private UserMapper() {
-    }
+@UtilityClass
+public class UserMapper {
 
     public static User toUser(UserCreateDto dto) {
         return User.builder()

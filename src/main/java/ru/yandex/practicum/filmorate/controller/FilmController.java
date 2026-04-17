@@ -2,19 +2,14 @@ package ru.yandex.practicum.filmorate.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.filmorate.dto.FilmCreateDto;
 import ru.yandex.practicum.filmorate.dto.FilmResponseDto;
 import ru.yandex.practicum.filmorate.dto.FilmUpdateDto;
-import ru.yandex.practicum.filmorate.dto.mapper.FilmMapper;
-import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.service.FilmService;
 
 import java.util.Collection;
-import java.util.stream.Collectors;
 
-@Slf4j
 @RestController
 @RequestMapping("/films")
 @RequiredArgsConstructor
@@ -23,27 +18,22 @@ public class FilmController {
 
     @PostMapping
     public FilmResponseDto create(@Valid @RequestBody FilmCreateDto body) {
-        return FilmMapper.toResponse(filmService.addNewFilm(FilmMapper.toFilm(body)));
+        return filmService.addNewFilm(body);
     }
 
     @PutMapping
     public FilmResponseDto update(@Valid @RequestBody FilmUpdateDto body) {
-        return FilmMapper.toResponse(filmService.updateFilm(body.getId(), FilmMapper.toFilm(body)));
+        return filmService.updateFilm(body);
     }
 
     @GetMapping
     public Collection<FilmResponseDto> findAll() {
-        return filmService.getAllFilms().stream()
-                .map(FilmMapper::toResponse)
-                .collect(Collectors.toList());
+        return filmService.getAllFilms();
     }
 
     @GetMapping("/{id}")
     public FilmResponseDto findById(@PathVariable Long id) {
-        return FilmMapper.toResponse(
-                filmService.getFilmById(id)
-                        .orElseThrow(() -> new NotFoundException("Film with id " + id + " not found"))
-        );
+        return filmService.getFilmById(id);
     }
 
     @PutMapping("/{id}/like/{userId}")
@@ -58,8 +48,6 @@ public class FilmController {
 
     @GetMapping("/popular")
     public Collection<FilmResponseDto> getPopularFilms(@RequestParam(defaultValue = "10") int count) {
-        return filmService.getFilmsByLikes(count).stream()
-                .map(FilmMapper::toResponse)
-                .collect(Collectors.toList());
+        return filmService.getFilmsByLikes(count);
     }
 }

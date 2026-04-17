@@ -71,14 +71,6 @@ public class UserDbStorage implements UserStorage {
     }
 
     @Override
-    public boolean emailExists(String email) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM users WHERE email = ?", Integer.class, email
-        );
-        return count != null && count > 0;
-    }
-
-    @Override
     public Optional<User> getById(Long id) {
         List<User> users = jdbcTemplate.query(
                 "SELECT id, email, login, name, birthday FROM users WHERE id = ?",
@@ -96,16 +88,6 @@ public class UserDbStorage implements UserStorage {
     }
 
     @Override
-    public Optional<User> getByEmail(String email) {
-        List<User> users = jdbcTemplate.query(
-                "SELECT id, email, login, name, birthday FROM users WHERE email = ?",
-                new UserRowMapper(),
-                email
-        );
-        return users.stream().findFirst();
-    }
-
-    @Override
     public Collection<User> getAllUsers() {
         return jdbcTemplate.query(
                 "SELECT id, email, login, name, birthday FROM users",
@@ -116,6 +98,65 @@ public class UserDbStorage implements UserStorage {
     @Override
     public void delete(Long id) {
         jdbcTemplate.update("DELETE FROM users WHERE id = ?", id);
+    }
+
+    @Override
+    public void addFriend(Long userId, Long friendId) {
+        jdbcTemplate.update(
+                "MERGE INTO friendships (user_id, friend_id, status) VALUES (?, ?, 'UNCONFIRMED')",
+                userId, friendId
+        );
+
+        Integer reverseCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM friendships WHERE user_id = ? AND friend_id = ?",
+                Integer.class, friendId, userId
+        );
+        if (reverseCount != null && reverseCount > 0) {
+            jdbcTemplate.update(
+                    "UPDATE friendships SET status = 'CONFIRMED' " +
+                            "WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)",
+                    userId, friendId, friendId, userId
+            );
+        }
+    }
+
+    @Override
+    public void removeFriend(Long userId, Long friendId) {
+        jdbcTemplate.update(
+                "DELETE FROM friendships WHERE user_id = ? AND friend_id = ?",
+                userId, friendId
+        );
+
+        jdbcTemplate.update(
+                "UPDATE friendships SET status = 'UNCONFIRMED' " +
+                        "WHERE user_id = ? AND friend_id = ?",
+                friendId, userId
+        );
+    }
+
+    @Override
+    public Collection<User> getFriends(Long userId) {
+        return jdbcTemplate.query(
+                "SELECT u.id, u.email, u.login, u.name, u.birthday " +
+                        "FROM users u " +
+                        "JOIN friendships f ON u.id = f.friend_id " +
+                        "WHERE f.user_id = ?",
+                new UserRowMapper(),
+                userId
+        );
+    }
+
+    @Override
+    public Collection<User> getCommonFriends(Long userId, Long otherId) {
+        return jdbcTemplate.query(
+                "SELECT u.id, u.email, u.login, u.name, u.birthday " +
+                        "FROM users u " +
+                        "JOIN friendships f1 ON u.id = f1.friend_id " +
+                        "JOIN friendships f2 ON u.id = f2.friend_id " +
+                        "WHERE f1.user_id = ? AND f2.user_id = ?",
+                new UserRowMapper(),
+                userId, otherId
+        );
     }
 
     private void loadFriends(User user) {

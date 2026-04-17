@@ -1,8 +1,11 @@
 package ru.yandex.practicum.filmorate.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.dto.FilmCreateDto;
+import ru.yandex.practicum.filmorate.dto.FilmResponseDto;
+import ru.yandex.practicum.filmorate.dto.FilmUpdateDto;
+import ru.yandex.practicum.filmorate.dto.mapper.FilmMapper;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
@@ -12,8 +15,7 @@ import ru.yandex.practicum.filmorate.storage.mpa.MpaStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,40 +24,32 @@ public class FilmService {
     private final UserStorage userStorage;
     private final MpaStorage mpaStorage;
     private final GenreStorage genreStorage;
-    private final JdbcTemplate jdbcTemplate;
 
-    public Film addNewFilm(Film film) {
+    public FilmResponseDto addNewFilm(FilmCreateDto dto) {
+        Film film = FilmMapper.toFilm(dto);
         validateMpaAndGenres(film);
-        return filmStorage.create(film);
+        return FilmMapper.toResponse(filmStorage.create(film));
     }
 
-    public Film updateFilm(Long id, Film film) {
-        if (!filmStorage.existsById(id)) {
-            throw new NotFoundException("Film with id " + id + " does not exist");
+    public FilmResponseDto updateFilm(FilmUpdateDto dto) {
+        if (!filmStorage.existsById(dto.getId())) {
+            throw new NotFoundException("Film with id " + dto.getId() + " does not exist");
         }
+        Film film = FilmMapper.toFilm(dto);
         validateMpaAndGenres(film);
-        return filmStorage.update(id, film);
+        return FilmMapper.toResponse(filmStorage.update(dto.getId(), film));
     }
 
-    private void validateMpaAndGenres(Film film) {
-        if (film.getMpa() != null) {
-            mpaStorage.getById(film.getMpa().getId())
-                    .orElseThrow(() -> new NotFoundException("MPA rating with id " + film.getMpa().getId() + " not found"));
-        }
-        if (film.getGenres() != null) {
-            for (Genre genre : film.getGenres()) {
-                genreStorage.getById(genre.getId())
-                        .orElseThrow(() -> new NotFoundException("Genre with id " + genre.getId() + " not found"));
-            }
-        }
+    public FilmResponseDto getFilmById(Long id) {
+        Film film = filmStorage.getById(id)
+                .orElseThrow(() -> new NotFoundException("Film with id " + id + " not found"));
+        return FilmMapper.toResponse(film);
     }
 
-    public Optional<Film> getFilmById(Long id) {
-        return filmStorage.getById(id);
-    }
-
-    public Collection<Film> getAllFilms() {
-        return filmStorage.getAll();
+    public Collection<FilmResponseDto> getAllFilms() {
+        return filmStorage.getAll().stream()
+                .map(FilmMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
     public void addLike(Long filmId, Long userId) {
@@ -65,10 +59,7 @@ public class FilmService {
         if (!userStorage.existsById(userId)) {
             throw new NotFoundException("User with id " + userId + " does not exist");
         }
-        jdbcTemplate.update(
-                "MERGE INTO film_likes (film_id, user_id) VALUES (?, ?)",
-                filmId, userId
-        );
+        filmStorage.addLike(filmId, userId);
     }
 
     public void removeLike(Long filmId, Long userId) {
@@ -78,27 +69,27 @@ public class FilmService {
         if (!userStorage.existsById(userId)) {
             throw new NotFoundException("User with id " + userId + " does not exist");
         }
-        jdbcTemplate.update(
-                "DELETE FROM film_likes WHERE film_id = ? AND user_id = ?",
-                filmId, userId
-        );
+        filmStorage.removeLike(filmId, userId);
     }
 
-    public Collection<Film> getFilmsByLikes(int count) {
-        List<Long> filmIds = jdbcTemplate.query(
-                "SELECT f.id FROM films f " +
-                        "LEFT JOIN film_likes fl ON f.id = fl.film_id " +
-                        "GROUP BY f.id " +
-                        "ORDER BY COUNT(fl.user_id) DESC " +
-                        "LIMIT ?",
-                (rs, rowNum) -> rs.getLong("id"),
-                count
-        );
+    public Collection<FilmResponseDto> getFilmsByLikes(int count) {
+        return filmStorage.getPopularFilms(count).stream()
+                .map(FilmMapper::toResponse)
+                .collect(Collectors.toList());
+    }
 
-        return filmIds.stream()
-                .map(filmStorage::getById)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .toList();
+    private void validateMpaAndGenres(Film film) {
+        if (film.getMpa() != null) {
+            mpaStorage.getById(film.getMpa().getId())
+                    .orElseThrow(() -> new NotFoundException(
+                            "MPA rating with id " + film.getMpa().getId() + " not found"));
+        }
+        if (film.getGenres() != null) {
+            for (Genre genre : film.getGenres()) {
+                genreStorage.getById(genre.getId())
+                        .orElseThrow(() -> new NotFoundException(
+                                "Genre with id " + genre.getId() + " not found"));
+            }
+        }
     }
 }

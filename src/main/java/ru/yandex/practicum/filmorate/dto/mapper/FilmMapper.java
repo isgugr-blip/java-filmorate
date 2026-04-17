@@ -1,6 +1,10 @@
 package ru.yandex.practicum.filmorate.dto.mapper;
 
-import ru.yandex.practicum.filmorate.dto.*;
+import lombok.experimental.UtilityClass;
+import ru.yandex.practicum.filmorate.dto.FilmCreateDto;
+import ru.yandex.practicum.filmorate.dto.FilmResponseDto;
+import ru.yandex.practicum.filmorate.dto.FilmUpdateDto;
+import ru.yandex.practicum.filmorate.dto.GenreDto;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
@@ -8,10 +12,8 @@ import ru.yandex.practicum.filmorate.model.Mpa;
 import java.util.LinkedHashSet;
 import java.util.stream.Collectors;
 
-public final class FilmMapper {
-
-    private FilmMapper() {
-    }
+@UtilityClass
+public class FilmMapper {
 
     public static Film toFilm(FilmCreateDto dto) {
         Film.FilmBuilder builder = Film.builder()
@@ -65,15 +67,12 @@ public final class FilmMapper {
                 .duration(film.getDuration());
 
         if (film.getMpa() != null) {
-            builder.mpa(MpaDto.builder()
-                    .id(film.getMpa().getId())
-                    .name(film.getMpa().getName())
-                    .build());
+            builder.mpa(MpaMapper.toDto(film.getMpa()));
         }
 
         if (film.getGenres() != null) {
             LinkedHashSet<GenreDto> genres = film.getGenres().stream()
-                    .map(g -> GenreDto.builder().id(g.getId()).name(g.getName()).build())
+                    .map(GenreMapper::toDto)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
             builder.genres(genres);
         }
