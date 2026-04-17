@@ -1,46 +1,39 @@
 package ru.yandex.practicum.filmorate.controller;
 
 import jakarta.validation.Valid;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.dto.FilmCreateDto;
+import ru.yandex.practicum.filmorate.dto.FilmResponseDto;
+import ru.yandex.practicum.filmorate.dto.FilmUpdateDto;
 import ru.yandex.practicum.filmorate.service.FilmService;
-
-import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 
 import java.util.Collection;
 
-@Slf4j
 @RestController
 @RequestMapping("/films")
+@RequiredArgsConstructor
 public class FilmController {
     private final FilmService filmService;
 
-    @Autowired
-    public FilmController(FilmService filmService) {
-        this.filmService =  filmService;
-    }
-
     @PostMapping
-    public Film create(@Valid @RequestBody Film body) {
+    public FilmResponseDto create(@Valid @RequestBody FilmCreateDto body) {
         return filmService.addNewFilm(body);
     }
 
     @PutMapping
-    public Film update(@Valid @RequestBody Film body) {
-        return filmService.updateFilm(body.getId(), body);
+    public FilmResponseDto update(@Valid @RequestBody FilmUpdateDto body) {
+        return filmService.updateFilm(body);
     }
 
     @GetMapping
-    public Collection<Film> findAll() {
+    public Collection<FilmResponseDto> findAll() {
         return filmService.getAllFilms();
     }
 
     @GetMapping("/{id}")
-    public Film findById(@PathVariable Long id) {
-        return filmService.getFilmById(id)
-                .orElseThrow(() -> new NotFoundException("Film with id " + id + " not found"));
+    public FilmResponseDto findById(@PathVariable Long id) {
+        return filmService.getFilmById(id);
     }
 
     @PutMapping("/{id}/like/{userId}")
@@ -54,7 +47,7 @@ public class FilmController {
     }
 
     @GetMapping("/popular")
-    public Collection<Film> getPopularFilms(@RequestParam(defaultValue = "10") int count) {
+    public Collection<FilmResponseDto> getPopularFilms(@RequestParam(defaultValue = "10") int count) {
         return filmService.getFilmsByLikes(count);
     }
 }

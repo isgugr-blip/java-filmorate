@@ -1,68 +1,95 @@
 package ru.yandex.practicum.filmorate.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.dto.FilmCreateDto;
+import ru.yandex.practicum.filmorate.dto.FilmResponseDto;
+import ru.yandex.practicum.filmorate.dto.FilmUpdateDto;
+import ru.yandex.practicum.filmorate.dto.mapper.FilmMapper;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
+import ru.yandex.practicum.filmorate.storage.genre.GenreStorage;
+import ru.yandex.practicum.filmorate.storage.mpa.MpaStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.util.Collection;
-import java.util.Comparator;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class FilmService {
     private final FilmStorage filmStorage;
     private final UserStorage userStorage;
+    private final MpaStorage mpaStorage;
+    private final GenreStorage genreStorage;
 
-    @Autowired
-    public FilmService(FilmStorage filmStorage, UserStorage userStorage) {
-        this.filmStorage = filmStorage;
-        this.userStorage = userStorage;
+    public FilmResponseDto addNewFilm(FilmCreateDto dto) {
+        Film film = FilmMapper.toFilm(dto);
+        validateMpaAndGenres(film);
+        return FilmMapper.toResponse(filmStorage.create(film));
     }
 
-    public Film addNewFilm(Film film) {
-        return filmStorage.create(film);
-    }
-
-    public Film updateFilm(Long id, Film film) {
-        return filmStorage.update(id, film);
-    }
-
-    public Optional<Film> getFilmById(Long id) {
-        return filmStorage.getById(id);
-    }
-
-    public Collection<Film> getAllFilms() {
-        return filmStorage.getAll();
-    }
-
-    public void addLike(Long id, Long userId) {
-        if (!userStorage.existsById(userId)) {
-            throw new NotFoundException("User with id " + userId + " does not exist");
+    public FilmResponseDto updateFilm(FilmUpdateDto dto) {
+        if (!filmStorage.existsById(dto.getId())) {
+            throw new NotFoundException("Film with id " + dto.getId() + " does not exist");
         }
-        Film film = getFilmById(id)
-                .orElseThrow(() -> new NotFoundException("Film with id " + id + " does not exist"));
-
-        film.getLikes().add(userId);
+        Film film = FilmMapper.toFilm(dto);
+        validateMpaAndGenres(film);
+        return FilmMapper.toResponse(filmStorage.update(dto.getId(), film));
     }
 
-    public void removeLike(Long id, Long userId) {
-        if (!userStorage.existsById(userId)) {
-            throw new NotFoundException("User with id " + userId + " does not exist");
-        }
-        Film film = getFilmById(id)
-                .orElseThrow(() -> new NotFoundException("Film with id " + id + " does not exist"));
-
-        film.getLikes().remove(userId);
+    public FilmResponseDto getFilmById(Long id) {
+        Film film = filmStorage.getById(id)
+                .orElseThrow(() -> new NotFoundException("Film with id " + id + " not found"));
+        return FilmMapper.toResponse(film);
     }
 
-    public Collection<Film> getFilmsByLikes(int count) {
+    public Collection<FilmResponseDto> getAllFilms() {
         return filmStorage.getAll().stream()
-                .sorted(Comparator.comparingInt((Film f) -> f.getLikes().size()).reversed())
-                .limit(count)
+                .map(FilmMapper::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    public void addLike(Long filmId, Long userId) {
+        if (!filmStorage.existsById(filmId)) {
+            throw new NotFoundException("Film with id " + filmId + " does not exist");
+        }
+        if (!userStorage.existsById(userId)) {
+            throw new NotFoundException("User with id " + userId + " does not exist");
+        }
+        filmStorage.addLike(filmId, userId);
+    }
+
+    public void removeLike(Long filmId, Long userId) {
+        if (!filmStorage.existsById(filmId)) {
+            throw new NotFoundException("Film with id " + filmId + " does not exist");
+        }
+        if (!userStorage.existsById(userId)) {
+            throw new NotFoundException("User with id " + userId + " does not exist");
+        }
+        filmStorage.removeLike(filmId, userId);
+    }
+
+    public Collection<FilmResponseDto> getFilmsByLikes(int count) {
+        return filmStorage.getPopularFilms(count).stream()
+                .map(FilmMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    private void validateMpaAndGenres(Film film) {
+        if (film.getMpa() != null) {
+            mpaStorage.getById(film.getMpa().getId())
+                    .orElseThrow(() -> new NotFoundException(
+                            "MPA rating with id " + film.getMpa().getId() + " not found"));
+        }
+        if (film.getGenres() != null) {
+            for (Genre genre : film.getGenres()) {
+                genreStorage.getById(genre.getId())
+                        .orElseThrow(() -> new NotFoundException(
+                                "Genre with id " + genre.getId() + " not found"));
+            }
+        }
     }
 }
