@@ -1,46 +1,49 @@
 package ru.yandex.practicum.filmorate.controller;
 
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.dto.FilmCreateDto;
+import ru.yandex.practicum.filmorate.dto.FilmResponseDto;
+import ru.yandex.practicum.filmorate.dto.FilmUpdateDto;
+import ru.yandex.practicum.filmorate.dto.mapper.FilmMapper;
+import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
 import ru.yandex.practicum.filmorate.service.FilmService;
 
-import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
-
 import java.util.Collection;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
 @RequestMapping("/films")
+@RequiredArgsConstructor
 public class FilmController {
     private final FilmService filmService;
 
-    @Autowired
-    public FilmController(FilmService filmService) {
-        this.filmService =  filmService;
-    }
-
     @PostMapping
-    public Film create(@Valid @RequestBody Film body) {
-        return filmService.addNewFilm(body);
+    public FilmResponseDto create(@Valid @RequestBody FilmCreateDto body) {
+        return FilmMapper.toResponse(filmService.addNewFilm(FilmMapper.toFilm(body)));
     }
 
     @PutMapping
-    public Film update(@Valid @RequestBody Film body) {
-        return filmService.updateFilm(body.getId(), body);
+    public FilmResponseDto update(@Valid @RequestBody FilmUpdateDto body) {
+        return FilmMapper.toResponse(filmService.updateFilm(body.getId(), FilmMapper.toFilm(body)));
     }
 
     @GetMapping
-    public Collection<Film> findAll() {
-        return filmService.getAllFilms();
+    public Collection<FilmResponseDto> findAll() {
+        return filmService.getAllFilms().stream()
+                .map(FilmMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public Film findById(@PathVariable Long id) {
-        return filmService.getFilmById(id)
-                .orElseThrow(() -> new NotFoundException("Film with id " + id + " not found"));
+    public FilmResponseDto findById(@PathVariable Long id) {
+        return FilmMapper.toResponse(
+                filmService.getFilmById(id)
+                        .orElseThrow(() -> new NotFoundException("Film with id " + id + " not found"))
+        );
     }
 
     @PutMapping("/{id}/like/{userId}")
@@ -54,7 +57,9 @@ public class FilmController {
     }
 
     @GetMapping("/popular")
-    public Collection<Film> getPopularFilms(@RequestParam(defaultValue = "10") int count) {
-        return filmService.getFilmsByLikes(count);
+    public Collection<FilmResponseDto> getPopularFilms(@RequestParam(defaultValue = "10") int count) {
+        return filmService.getFilmsByLikes(count).stream()
+                .map(FilmMapper::toResponse)
+                .collect(Collectors.toList());
     }
 }

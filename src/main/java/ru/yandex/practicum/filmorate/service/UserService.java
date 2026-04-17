@@ -1,7 +1,8 @@
 package ru.yandex.practicum.filmorate.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exceptions.ConditionsNotMetException;
 import ru.yandex.practicum.filmorate.exceptions.NotFoundException;
@@ -9,19 +10,15 @@ import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class UserService {
     private final UserStorage userStorage;
-
-    @Autowired
-    public UserService(UserStorage userStorage) {
-        this.userStorage = userStorage;
-    }
+    private final JdbcTemplate jdbcTemplate;
 
     public User createUser(User user) {
         return userStorage.create(user);
@@ -60,20 +57,45 @@ public class UserService {
     }
 
     public void addFriend(Long userId, Long friendId) {
-        User user1 = userStorage.getById(userId)
-                .orElseThrow(() -> new NotFoundException("User with id " + userId + " does not exist"));
-        User user2 = userStorage.getById(friendId)
-                .orElseThrow(() -> new NotFoundException("User with id " + friendId + " does not exist"));
+        if (!userStorage.existsById(userId)) {
+            throw new NotFoundException("User with id " + userId + " does not exist");
+        }
+        if (!userStorage.existsById(friendId)) {
+            throw new NotFoundException("User with id " + friendId + " does not exist");
+        }
 
-        user1.getFriends().add(friendId);
-        user2.getFriends().add(userId);
+        // Односторонняя дружба: добавляем только запись (userId -> friendId)
+        jdbcTemplate.update(
+                "MERGE INTO friendships (user_id, friend_id, status) VALUES (?, ?, 'UNCONFIRMED')",
+                userId, friendId
+        );
+
+        // Если обратная запись существует — обе становятся CONFIRMED
+        Integer reverseCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM friendships WHERE user_id = ? AND friend_id = ?",
+                Integer.class, friendId, userId
+        );
+        if (reverseCount != null && reverseCount > 0) {
+            jdbcTemplate.update(
+                    "UPDATE friendships SET status = 'CONFIRMED' " +
+                            "WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)",
+                    userId, friendId, friendId, userId
+            );
+        }
     }
 
     public Collection<User> getFriends(Long userId) {
-        User user = userStorage.getById(userId)
-                .orElseThrow(() -> new NotFoundException("User with id " + userId + " does not exist"));
+        if (!userStorage.existsById(userId)) {
+            throw new NotFoundException("User with id " + userId + " does not exist");
+        }
 
-        return user.getFriends().stream()
+        List<Long> friendIds = jdbcTemplate.query(
+                "SELECT friend_id FROM friendships WHERE user_id = ?",
+                (rs, rowNum) -> rs.getLong("friend_id"),
+                userId
+        );
+
+        return friendIds.stream()
                 .map(userStorage::getById)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
@@ -81,14 +103,22 @@ public class UserService {
     }
 
     public Collection<User> getCommonFriends(Long userId, Long otherId) {
-        User user1 = userStorage.getById(userId)
-                .orElseThrow(() -> new NotFoundException("User with id " + userId + " does not exist"));
-        User user2 = userStorage.getById(otherId)
-                .orElseThrow(() -> new NotFoundException("User with id " + otherId + " does not exist"));
+        if (!userStorage.existsById(userId)) {
+            throw new NotFoundException("User with id " + userId + " does not exist");
+        }
+        if (!userStorage.existsById(otherId)) {
+            throw new NotFoundException("User with id " + otherId + " does not exist");
+        }
 
-        Set<Long> commonFriendIds = new HashSet<>(user1.getFriends());
-        commonFriendIds.retainAll(user2.getFriends());
-        return commonFriendIds.stream()
+        List<Long> commonIds = jdbcTemplate.query(
+                "SELECT f1.friend_id FROM friendships f1 " +
+                        "JOIN friendships f2 ON f1.friend_id = f2.friend_id " +
+                        "WHERE f1.user_id = ? AND f2.user_id = ?",
+                (rs, rowNum) -> rs.getLong("friend_id"),
+                userId, otherId
+        );
+
+        return commonIds.stream()
                 .map(userStorage::getById)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
@@ -96,12 +126,23 @@ public class UserService {
     }
 
     public void removeFriend(Long userId, Long friendId) {
-        User user1 = userStorage.getById(userId)
-                .orElseThrow(() -> new NotFoundException("User with id " + userId + " does not exist"));
-        User user2 = userStorage.getById(friendId)
-                .orElseThrow(() -> new NotFoundException("User with id " + friendId + " does not exist"));
+        if (!userStorage.existsById(userId)) {
+            throw new NotFoundException("User with id " + userId + " does not exist");
+        }
+        if (!userStorage.existsById(friendId)) {
+            throw new NotFoundException("User with id " + friendId + " does not exist");
+        }
 
-        user1.getFriends().remove(friendId);
-        user2.getFriends().remove(userId);
+        jdbcTemplate.update(
+                "DELETE FROM friendships WHERE user_id = ? AND friend_id = ?",
+                userId, friendId
+        );
+
+        // Если обратная запись была CONFIRMED — понизить до UNCONFIRMED
+        jdbcTemplate.update(
+                "UPDATE friendships SET status = 'UNCONFIRMED' " +
+                        "WHERE user_id = ? AND friend_id = ?",
+                friendId, userId
+        );
     }
 }
